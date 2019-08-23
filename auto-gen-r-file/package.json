@@ -1,0 +1,22 @@
+{
+  "name": "auto-gen-r-file",
+  "version": "0.0.4",
+  "description": "The package template for getting started.",
+  "author": "Cocos Creator",
+  "main": "main.js",
+  "main-menu": {
+    "i18n:MAIN_MENU.package.title/自动生成 R 文件/生成": {
+      "message": "auto-gen-r-file:gen"
+    },
+    "i18n:MAIN_MENU.package.title/自动生成 R 文件/刷新所有文件": {
+      "message": "auto-gen-r-file:own-refresh"
+    }
+  },
+  "panel": {
+    "main": "panel/index.js",
+    "type": "dockable",
+    "title": "auto-gen-r-file",
+    "width": 400,
+    "height": 300
+  }
+}

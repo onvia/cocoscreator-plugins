@@ -1,0 +1,23 @@
+{
+  "name": "level-editor",
+  "version": "0.0.1",
+  "description": "The package template for getting started.",
+  "author": "Cocos Creator",
+  "main": "main.js",
+  "main-menu": {
+    "i18n:MAIN_MENU.package.title/导出关卡数据/重新导出": {
+      "message": "level-editor:rewrite"
+    },
+    "i18n:MAIN_MENU.package.title/导出关卡数据/测试": {
+      "message": "level-editor:open"
+    }
+  },
+  "scene-script":"core/level_editor.js",
+  "panel": {
+    "main": "panel/index.js",
+    "type": "dockable",
+    "title": "level-editor",
+    "width": 400,
+    "height": 300
+  }
+}
