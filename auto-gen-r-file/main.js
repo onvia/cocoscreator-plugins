@@ -4,13 +4,17 @@
 
 var path = require('path');
 var fs = require('fs');
+let utils = require('./utils');
+
 var scriptFolder = "scripts";//脚本文件夹
 var sceneFolder = "db://assets/scene/" //场景文件夹
 var res_path_url = "db://assets/resources/"; //动态加载资源文件夹
-var r_file_url = "db://assets/scripts/utils/R.ts" //R 文件位置
-var ignorePaths = ['db://assets/resources/Fonts']; //忽略文件夹，
+var r_file_url = "db://assets/Script/utils/R.ts" //R 文件位置
+var ignorePaths = ['db://assets/resources/Fonts','db://assets/resources/temp']; //忽略文件夹，
+var ignoreExt = ['.meta','.pac']; //忽略文件类型
 var classes = {};
 var isError = false;
+var isAutoGenR = false; //自动生成R文件
 
 let OPERATION_CREATE = 0;
 let OPERATION_MOVE = 1;
@@ -28,12 +32,11 @@ let operation_des = {
 function checkFolderState() {
     let packageUrl = r_file_url.substring(0, r_file_url.lastIndexOf("/"));
     let packagefspath = Editor.assetdb.urlToFspath(packageUrl);
+    let scenefspath = Editor.assetdb.urlToFspath(sceneFolder);
 
-    let exists = fs.existsSync(packagefspath);
-    if (!exists) {
-        Editor.log("auto gen R file: please create dir: ", packagefspath);
-        return false;
-    }
+    utils.mkdir(packagefspath);
+    utils.mkdir(scenefspath);
+    
     return true;
 }
 
@@ -74,7 +77,7 @@ function scanResFiles(dir) {
                 }
                 ext = ext.replace(".", "");
                 let classname = getClassName(ext);
-                
+
                 if (!(classname in classes)) {
                     classes[classname] = {};
                 }
@@ -88,14 +91,26 @@ function scanResFiles(dir) {
                 } else {}
                 //替换特殊字符 每一个括号内为一组
                 filebasename = filebasename.replace(/(\s+)|(\-)|(\@)/g, "_");
-
+                
                 if (!(filebasename in classes[classname])) {
-                    classes[classname][filebasename] = item;
-                } else {
+                    classes[classname][filebasename] = [];
+                }
+                
+                let has = classes[classname][filebasename].find(function(element){
+                    return element.path == item.path;
+                });
+                if(has){
                     isError = true;
-                    Editor.error(`auto gen r file: ${file_path} 文件名重复`);
+                    Editor.error(`auto gen r file: 相同文件夹下存在 ${file_path} 文件名重复`);
                     break;
                 }
+                classes[classname][filebasename].push(item);
+
+                //  else {
+                //     isError = true;
+                //     Editor.error(`auto gen r file: ${file_path} 文件名重复`);
+                //     break;
+                // }
             }
         }
     }
@@ -114,11 +129,14 @@ function getClassName(ext){
 
 
 function isIgnore(fileName) {
-    if (path.extname(fileName).toLocaleLowerCase() == ".meta") {
-        return true
-    } else {
-        return false
+    let ext = path.extname(fileName).toLocaleLowerCase();
+    for (let i = 0; i < ignoreExt.length; i++) {
+        const element = ignoreExt[i];
+        if(element == ext){
+            return true;
+        }
     }
+    return false;
 }
 
 function isIgnorePath(path){
@@ -219,7 +237,8 @@ function genRun() {
     //扫描所有文件夹
     let fspath = Editor.assetdb.urlToFspath(res_path_url);
     scanResFiles(fspath);
-
+    Editor.log('auto gen R file: scanResFiles end');
+  
     if (isError) {
         Editor.error(`auto gen r file: 生成失败，文件重复`);
         return;
@@ -230,12 +249,36 @@ function genRun() {
         content += `  export let ${classname} = {\n`;
         let _class = classes[classname];
         for (const variable in _class) {
-            let item = _class[variable];
-            let dburl = Editor.assetdb.fspathToUrl(item.path);
-            let ext = path.extname(item.path).toLocaleLowerCase();
-            dburl = dburl.replace("db://assets/resources/", "");
-            dburl = dburl.replace(ext, '');
-            content += `    ${variable}: "${dburl}",\n`;
+            
+            let arr = _class[variable];
+            if(arr.length == 1){
+                let item = arr[0];
+                let dburl = Editor.assetdb.fspathToUrl(item.path);
+                let ext = path.extname(item.path).toLocaleLowerCase();
+                dburl = dburl.replace("db://assets/resources/", "");
+                dburl = dburl.replace(ext, '');
+                content += `    ${variable}: "${dburl}",\n`;
+            }else if(arr.length > 1){// 有同名文件
+                
+                // Editor.log('auto gen R file: 有同名文件 '+arr.length);
+                for (let i = 0; i < arr.length; i++) {
+                    const element = arr[i];
+                    let dburl1 = Editor.assetdb.fspathToUrl(element.path);
+                    let ext1 = path.extname(element.path).toLocaleLowerCase();
+                    dburl1 = dburl1.replace("db://assets/resources/", "");
+                    dburl1 = dburl1.replace(ext1, '');
+                    // dburl1.s
+                    let urlarr = dburl1.split("/");
+                    let extvar = "";
+                    if(urlarr.length > 1){ // 取文件的文件夹名作为变量名的扩展
+                        extvar = "_"+urlarr[urlarr.length - 2];
+                    }
+
+                    let tmpvariable = variable + extvar
+
+                    content += `    ${tmpvariable}: "${dburl1}",\n`;
+                }
+            }
 
         }
         content += "  }\n"
@@ -267,7 +310,8 @@ function checkGenR(arg, operation) {
         if(pathOrUrl.includes(scriptFolder) && operation == OPERATION_MOVE){
             checkTS(pathOrUrl);
         }
-        if (pathOrUrl.includes("resources")) {
+        //自动生成R文件
+        if (pathOrUrl.includes("resources") && isAutoGenR) {
             genRun();
         }
     } else if (!arg) {
